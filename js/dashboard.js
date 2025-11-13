@@ -22,26 +22,6 @@ document.addEventListener("click", async (event) => {
     }
   }
 
-  // CREATE TAG BUTTON
-  if (event.target.id === "create_tag_btn") {
-    await criarNovaTag();
-  }
-
-  // EDIT TAG BUTTONS
-  if (event.target.classList.contains("edit_tag_btn")) {
-    const tagId = event.target.dataset.tagId;
-    const tagName = event.target.dataset.tagName;
-    await editarTag(tagId, tagName);
-  }
-
-  // DELETE TAG BUTTONS
-  if (event.target.classList.contains("delete_tag_btn")) {
-    const tagId = event.target.dataset.tagId;
-    const tagName = event.target.dataset.tagName;
-    if (confirm(`Tem certeza que deseja deletar a tag "${tagName}"?`)) {
-      await deletarTag(tagId);
-    }
-  }
 });
 
 
@@ -137,6 +117,9 @@ async function renderizarLinks() {
       const tagsHTML = link.tags
         ? link.tags.map((tag) => `<span>${tag}</span>`).join("")
         : "";
+      
+      // Determinar texto do botão baseado na existência de tags
+      const editButtonText = (link.tags && link.tags.length > 0) ? "Editar" : "Add";
 
       div.innerHTML = `
         <div class="element_URL_subdiv">
@@ -152,7 +135,7 @@ async function renderizarLinks() {
         </div>
         <div class="element_CRUD_subdiv">
           <button class="button_CRUD button_delete_element" onclick="${link.id_link}"><span></span>Delete</button>
-          <button class="button_CRUD button_edit_element"><span></span>Edit</button>
+          <button class="button_CRUD button_edit_element"><span></span>${editButtonText}</button>
         </div>
       `;
 
@@ -225,128 +208,6 @@ async function deletarLink(id_link) {
 
 // ========== GERENCIAMENTO DE TAGS ==========
 
-// Renderizar lista de tags do usuário
-async function renderizarTagsUsuario() {
-  try {
-    const tags = await buscarTodasTags();
-    const container = document.getElementById("user_tags_list");
-    
-    if (!container) return;
-
-    if (tags.length === 0) {
-      container.innerHTML = "<p>Você ainda não tem tags. Crie uma acima!</p>";
-      return;
-    }
-
-    container.innerHTML = tags.map(tag => `
-      <div style="display: flex; align-items: center; justify-content: space-between; padding: 8px; margin: 5px 0; background: white; border-radius: 4px; border: 1px solid #ddd;">
-        <span style="font-weight: bold;">${tag.nome}</span>
-        <div>
-          <button class="edit_tag_btn" data-tag-id="${tag.id_tag}" data-tag-name="${tag.nome}" style="padding: 4px 8px; margin-right: 5px; border: 1px solid #007bff; background: #007bff; color: white; border-radius: 3px; cursor: pointer;">Edit</button>
-          <button class="delete_tag_btn" data-tag-id="${tag.id_tag}" data-tag-name="${tag.nome}" style="padding: 4px 8px; border: 1px solid #dc3545; background: #dc3545; color: white; border-radius: 3px; cursor: pointer;">Delete</button>
-        </div>
-      </div>
-    `).join("");
-
-  } catch (erro) {
-    console.error("Erro ao renderizar tags:", erro);
-  }
-}
-
-// Criar nova tag
-async function criarNovaTag() {
-  try {
-    const input = document.getElementById("new_tag_input");
-    const nome = input.value.trim();
-
-    if (!nome) {
-      alert("Digite um nome para a tag!");
-      return;
-    }
-
-    const response = await fetch("database/api/tags.php", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify({ nome }),
-    });
-
-    const data = await response.json();
-    console.log(data);
-
-    if (data.success) {
-      alert("Tag criada com sucesso!");
-      input.value = "";
-      await renderizarTagsUsuario();
-    } else {
-      alert("Erro ao criar tag: " + data.message);
-    }
-  } catch (error) {
-    console.error("Erro ao criar tag:", error);
-    alert("Erro ao criar tag: " + error.message);
-  }
-}
-
-// Editar tag
-async function editarTag(id_tag, nomeAtual) {
-  try {
-    const novoNome = prompt("Editar nome da tag:", nomeAtual);
-    
-    if (novoNome === null) return; // Cancelado
-    if (!novoNome.trim()) {
-      alert("Nome da tag não pode estar vazio!");
-      return;
-    }
-
-    const response = await fetch("database/api/tags.php", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify({ id_tag: parseInt(id_tag), nome: novoNome.trim() }),
-    });
-
-    const data = await response.json();
-    console.log(data);
-
-    if (data.success) {
-      alert("Tag atualizada com sucesso!");
-      await renderizarTagsUsuario();
-      await renderizarLinks(); // Atualizar links também
-    } else {
-      alert("Erro ao atualizar tag: " + data.message);
-    }
-  } catch (error) {
-    console.error("Erro ao editar tag:", error);
-    alert("Erro ao editar tag: " + error.message);
-  }
-}
-
-// Deletar tag
-async function deletarTag(id_tag) {
-  try {
-    const response = await fetch("database/api/tags.php", {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify({ id_tag: parseInt(id_tag) }),
-    });
-
-    const data = await response.json();
-    console.log(data);
-
-    if (data.success) {
-      alert("Tag deletada com sucesso!");
-      await renderizarTagsUsuario();
-      await renderizarLinks(); // Atualizar links também
-    } else {
-      alert("Erro ao deletar tag: " + data.message);
-    }
-  } catch (error) {
-    console.error("Erro ao deletar tag:", error);
-    alert("Erro ao deletar tag: " + error.message);
-  }
-}
-
 // Buscar todas as tags do usuário
 async function buscarTodasTags() {
   try {
@@ -387,60 +248,119 @@ async function buscarTagsLink(id_link) {
   }
 }
 
-// Abrir modal para editar tags de um link
+// Abrir floating window para gerenciar tags de um link
 async function abrirModalEditarTags(id_link) {
   try {
     // Buscar todas as tags disponíveis
     const todasTags = await buscarTodasTags();
     
-    if (todasTags.length === 0) {
-      alert("Você ainda não tem tags. Crie algumas tags primeiro na seção 'Manage Tags' acima.");
-      return;
-    }
-
     // Buscar tags atuais do link
     const tagsAtuais = await buscarTagsLink(id_link);
     const idsTagsAtuais = tagsAtuais.map(tag => tag.id_tag);
 
-    // Criar modal
+    // Se não tem tags, mostrar opção de criar
+    if (todasTags.length === 0) {
+      const criarTag = confirm("Você ainda não tem tags. Deseja criar uma nova tag agora?");
+      if (criarTag) {
+        await criarTagViaModal();
+        // Recarregar tags após criação
+        const novasTags = await buscarTodasTags();
+        if (novasTags.length === 0) return; // Se ainda não tem tags, sair
+        else {
+          // Continuar com as novas tags
+          await abrirModalEditarTags(id_link);
+          return;
+        }
+      } else {
+        return;
+      }
+    }
+
+    // Criar floating window
     const modal = document.createElement('div');
     modal.id = 'tag_modal';
     modal.style.cssText = `
       position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
-      background: rgba(0,0,0,0.5); display: flex; justify-content: center; 
-      align-items: center; z-index: 1000;
+      background: rgba(20, 13, 28, 0.8); display: flex; justify-content: center; 
+      align-items: center; z-index: 1000; backdrop-filter: blur(2px);
     `;
 
     const modalContent = document.createElement('div');
     modalContent.style.cssText = `
-      background: white; padding: 20px; border-radius: 8px; 
-      min-width: 400px; max-width: 600px; max-height: 70vh; 
-      overflow-y: auto; box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+      background: var(--link_bg); padding: 25px; 
+      border-radius: var(--general_border_radius); 
+      min-width: 450px; max-width: 600px; max-height: 80vh; 
+      overflow-y: auto; box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+      border: 1px solid var(--highlight_purple);
+      color: var(--dark_text_color);
     `;
 
+    const temTags = idsTagsAtuais.length > 0;
+    const titulo = temTags ? "Editar Tags do Link" : "Adicionar Tags ao Link";
+
     modalContent.innerHTML = `
-      <h3>Edit Tags for Link</h3>
-      <p>Select which tags you want to associate with this link:</p>
-      <div id="tag_checkboxes" style="margin: 15px 0;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h3 style="margin: 0; color: var(--highlight_purple); font-size: 18px;">${titulo}</h3>
+        <button id="criar_nova_tag_btn" style="
+          padding: 6px 12px; background: var(--highlight_blue); color: white; 
+          border: none; border-radius: 6px; cursor: pointer; font-size: 12px;
+          transition: background 0.2s;
+        " onmouseover="this.style.background='var(--hover_highlight_blue)'" 
+           onmouseout="this.style.background='var(--highlight_blue)'">
+          + Nova Tag
+        </button>
+      </div>
+      <p style="margin-bottom: 15px; color: var(--dark_text_color);">
+        Selecione as tags que deseja associar a este link:
+      </p>
+      <div id="tag_checkboxes" style="margin: 15px 0; max-height: 300px; overflow-y: auto;">
         ${todasTags.map(tag => `
-          <label style="display: block; margin: 8px 0; cursor: pointer;">
-            <input type="checkbox" value="${tag.id_tag}" ${idsTagsAtuais.includes(tag.id_tag) ? 'checked' : ''} style="margin-right: 8px;">
-            <span>${tag.nome}</span>
+          <label style="
+            display: flex; align-items: center; margin: 12px 0; cursor: pointer;
+            padding: 8px; border-radius: 6px; transition: background 0.2s;
+            background: ${idsTagsAtuais.includes(tag.id_tag) ? 'var(--highlight_text_color)' : 'white'};
+          " onmouseover="this.style.background='var(--highlight_text_color)'" 
+             onmouseout="this.style.background='${idsTagsAtuais.includes(tag.id_tag) ? 'var(--highlight_text_color)' : 'white'}'">
+            <input type="checkbox" value="${tag.id_tag}" 
+              ${idsTagsAtuais.includes(tag.id_tag) ? 'checked' : ''} 
+              style="margin-right: 12px; transform: scale(1.2);">
+            <span style="font-weight: 500;">${tag.nome}</span>
           </label>
         `).join('')}
       </div>
-      <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
-        <button id="cancel_tags" style="padding: 8px 16px; border: 1px solid #ccc; background: white; border-radius: 4px; cursor: pointer;">Cancel</button>
-        <button id="save_tags" style="padding: 8px 16px; border: 1px solid #007bff; background: #007bff; color: white; border-radius: 4px; cursor: pointer;">Save Tags</button>
+      <div style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 25px;">
+        <button id="cancel_tags" style="
+          padding: 10px 20px; border: 1px solid var(--secondary_text_color); 
+          background: white; border-radius: 6px; cursor: pointer;
+          color: var(--dark_text_color); transition: all 0.2s;
+        " onmouseover="this.style.background='#f5f5f5'" 
+           onmouseout="this.style.background='white'">
+          Cancelar
+        </button>
+        <button id="save_tags" style="
+          padding: 10px 20px; border: none; background: var(--highlight_purple); 
+          color: white; border-radius: 6px; cursor: pointer;
+          transition: background 0.2s;
+        " onmouseover="this.style.background='var(--hover_highlight_blue)'" 
+           onmouseout="this.style.background='var(--highlight_purple)'">
+          ${temTags ? 'Salvar Alterações' : 'Adicionar Tags'}
+        </button>
       </div>
     `;
 
     modal.appendChild(modalContent);
     document.body.appendChild(modal);
 
-    // Event listeners para os botões
+    // Event listeners
     document.getElementById('cancel_tags').onclick = () => {
       document.body.removeChild(modal);
+    };
+
+    document.getElementById('criar_nova_tag_btn').onclick = async () => {
+      await criarTagViaModal();
+      document.body.removeChild(modal);
+      // Reabrir modal com novas tags
+      await abrirModalEditarTags(id_link);
     };
 
     document.getElementById('save_tags').onclick = async () => {
@@ -464,6 +384,33 @@ async function abrirModalEditarTags(id_link) {
   } catch (erro) {
     console.error("Erro ao abrir modal de tags:", erro);
     alert("Erro ao abrir editor de tags: " + erro.message);
+  }
+}
+
+// Criar nova tag via modal
+async function criarTagViaModal() {
+  const nomeTag = prompt("Digite o nome da nova tag:");
+  if (!nomeTag || !nomeTag.trim()) {
+    return;
+  }
+
+  try {
+    const response = await fetch("database/api/tags.php", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ nome: nomeTag.trim() }),
+    });
+
+    const data = await response.json();
+    if (data.success) {
+      alert("Tag criada com sucesso!");
+    } else {
+      alert("Erro ao criar tag: " + data.message);
+    }
+  } catch (error) {
+    console.error("Erro ao criar tag:", error);
+    alert("Erro ao criar tag: " + error.message);
   }
 }
 
@@ -571,5 +518,4 @@ document.addEventListener("DOMContentLoaded", () => {
   mostrarNome();
   mostrarQtdLinks();
   renderizarLinks();
-  renderizarTagsUsuario(); // Carregar as tags do usuário
 });
